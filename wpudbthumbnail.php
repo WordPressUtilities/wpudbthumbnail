@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.4
+Version: 0.4.1
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -19,9 +19,8 @@ class wpudbthumbnail {
 
     public function __construct() {
         add_action('init', array(&$this, 'init'));
-        /* Will replace save_post action */
-        // add_action('update_post_meta', array(&$this, 'update_post_meta'), 10, 4);
-        add_action('save_post', array(&$this, 'save_post'));
+        add_action('added_post_meta', array(&$this, 'update_post_meta'), 10, 4);
+        add_action('updated_postmeta', array(&$this, 'update_post_meta'), 10, 4);
     }
 
     public function init() {
