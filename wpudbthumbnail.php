@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.4.1
+Version: 0.5
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -21,6 +21,7 @@ class wpudbthumbnail {
         add_action('init', array(&$this, 'init'));
         add_action('added_post_meta', array(&$this, 'update_post_meta'), 10, 4);
         add_action('updated_postmeta', array(&$this, 'update_post_meta'), 10, 4);
+        add_action('deleted_post_meta', array(&$this, 'deleted_post_meta'), 10, 4);
     }
 
     public function init() {
@@ -35,6 +36,14 @@ class wpudbthumbnail {
             return false;
         }
         $this->save_post($object_id);
+    }
+
+    public function deleted_post_meta($meta_ids, $object_id, $meta_key, $_meta_value) {
+        if ($meta_key != '_thumbnail_id') {
+            return false;
+        }
+        delete_post_meta($object_id, $this->meta_id);
+        delete_post_meta($object_id, $this->meta_id . '_id');
     }
 
     /* Triggered when post is saved */
@@ -118,6 +127,17 @@ class wpudbthumbnail {
 
         return $base64;
     }
+
+    /* ----------------------------------------------------------
+      Uninstall
+    ---------------------------------------------------------- */
+
+    public function uninstall() {
+        /* Delete used post metas */
+        delete_post_meta_by_key($this->meta_id);
+        delete_post_meta_by_key($this->meta_id . '_id');
+    }
+
 }
 
 $wpudbthumbnail = new wpudbthumbnail();
