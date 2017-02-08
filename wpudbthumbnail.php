@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.5
+Version: 0.5.1
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -15,6 +15,7 @@ class wpudbthumbnail {
     private $meta_id = 'wpudbthumbnail_base64thumb';
     private $jpeg_quality = 30;
     private $image_size = 10;
+    private $cache_in_file = false;
     private $post_types = 'any';
 
     public function __construct() {
@@ -28,6 +29,7 @@ class wpudbthumbnail {
         $this->jpeg_quality = apply_filters('wpudbthumbnail_jpegquality', $this->jpeg_quality);
         $this->image_size = apply_filters('wpudbthumbnail_imagesize', $this->image_size);
         $this->post_types = apply_filters('wpudbthumbnail_posttypes', $this->post_types);
+        $this->cache_in_file = apply_filters('wpudbthumbnail_cacheinfile', $this->cache_in_file);
     }
 
     /* Triggered when _thumbnail_id is modified */
@@ -85,9 +87,25 @@ class wpudbthumbnail {
         $base64 = $this->get_base64_thumb($post_thumbnail_id);
 
         if ($base64 !== false) {
-            update_post_meta($post_id, $this->meta_id, $base64);
+            if ($this->cache_in_file) {
+                $this->cachefilebase64($post_id, $base64);
+            } else {
+                update_post_meta($post_id, $this->meta_id, $base64);
+            }
             update_post_meta($post_id, $this->meta_id . '_id', $post_thumbnail_id);
         }
+    }
+
+    public function cachefilebase64($post_id, $base64) {
+        $upload_dir = wp_upload_dir();
+        $this->cache_dir = apply_filters('wpudbthumbnail_cachedir', $upload_dir['basedir'] . '/wpudbthumbnail/');
+        $this->cache_file = $this->cache_dir . 'post-' . $post_id . '.base64';
+        if (!is_dir($this->cache_dir)) {
+            @mkdir($this->cache_dir, 0755);
+            @chmod($this->cache_dir, 0755);
+            @file_put_contents($this->cache_dir . '.htaccess', 'deny from all');
+        }
+        file_put_contents($this->cache_file, $base64);
     }
 
     public function get_base64_thumb($post_thumbnail_id = false) {
