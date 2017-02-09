@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.5.1
+Version: 0.6
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -30,6 +30,16 @@ class wpudbthumbnail {
         $this->image_size = apply_filters('wpudbthumbnail_imagesize', $this->image_size);
         $this->post_types = apply_filters('wpudbthumbnail_posttypes', $this->post_types);
         $this->cache_in_file = apply_filters('wpudbthumbnail_cacheinfile', $this->cache_in_file);
+
+        if ($this->cache_in_file) {
+            $upload_dir = wp_upload_dir();
+            $this->cache_dir = apply_filters('wpudbthumbnail_cachedir', $upload_dir['basedir'] . '/wpudbthumbnail/');
+            if (!is_dir($this->cache_dir)) {
+                @mkdir($this->cache_dir, 0755);
+                @chmod($this->cache_dir, 0755);
+                @file_put_contents($this->cache_dir . '.htaccess', 'deny from all');
+            }
+        }
     }
 
     /* Triggered when _thumbnail_id is modified */
@@ -49,7 +59,7 @@ class wpudbthumbnail {
     }
 
     /* Triggered when post is saved */
-    public function save_post($post_id = false) {
+    public function save_post($post_id = false, $reload = false) {
 
         /* Invalid post */
         if (!is_numeric($post_id) || wp_is_post_revision($post_id) || 'trash' == get_post_status($post_id)) {
@@ -79,16 +89,16 @@ class wpudbthumbnail {
         }
 
         /* Same attachment is used */
-        if (get_post_meta($post_id, $this->meta_id . '_id', 1) == $post_thumbnail_id) {
+        if (!$reload && get_post_meta($post_id, $this->meta_id . '_id', 1) == $post_thumbnail_id) {
             return false;
         }
 
         /* Save as base64 */
-        $base64 = $this->get_base64_thumb($post_thumbnail_id);
+        $base64 = $this->set_base64_thumb($post_thumbnail_id);
 
         if ($base64 !== false) {
             if ($this->cache_in_file) {
-                $this->cachefilebase64($post_id, $base64);
+                $this->set_cachefilebase64($post_id, $base64);
             } else {
                 update_post_meta($post_id, $this->meta_id, $base64);
             }
@@ -96,19 +106,57 @@ class wpudbthumbnail {
         }
     }
 
-    public function cachefilebase64($post_id, $base64) {
-        $upload_dir = wp_upload_dir();
-        $this->cache_dir = apply_filters('wpudbthumbnail_cachedir', $upload_dir['basedir'] . '/wpudbthumbnail/');
+    public function get_cachefilebase64($post_id) {
         $this->cache_file = $this->cache_dir . 'post-' . $post_id . '.base64';
-        if (!is_dir($this->cache_dir)) {
-            @mkdir($this->cache_dir, 0755);
-            @chmod($this->cache_dir, 0755);
-            @file_put_contents($this->cache_dir . '.htaccess', 'deny from all');
+        if (file_exists($this->cache_file)) {
+            return file_get_contents($this->cache_file);
         }
+        return false;
+    }
+
+    public function set_cachefilebase64($post_id, $base64) {
+        $this->cache_file = $this->cache_dir . 'post-' . $post_id . '.base64';
         file_put_contents($this->cache_file, $base64);
     }
 
-    public function get_base64_thumb($post_thumbnail_id = false) {
+    public function get_base64_thumb_value($post_id = false) {
+        if ($this->cache_in_file) {
+            return $this->get_cachefilebase64($post_id);
+        } else {
+            return get_post_meta($post_id, $this->meta_id, 1);
+        }
+    }
+
+    public function get_base64_thumb($post_id = false) {
+        global $post;
+        /* Retrieve current post */
+        if ($post_id === false) {
+            if (!is_object($post)) {
+                return false;
+            }
+            $post_id = $post->ID;
+        }
+
+        /* Retrieve thumb code if avalaible */
+        $thumbnailcode_id = get_post_meta($post_id, $this->meta_id . '_id', 1);
+        $thumbnailcode = $this->get_base64_thumb_value($post_id);
+
+        if ($this->cache_in_file) {
+            $thumbnailcode = $this->get_cachefilebase64($post_id);
+        } else {
+            $thumbnailcode = get_post_meta($post_id, $this->meta_id, 1);
+        }
+
+        /* No thumb code, but a thumbnail should exist, regenerate */
+        if (!$thumbnailcode && ($thumbnailcode_id > 0 || $thumbnailcode_id == '')) {
+            $this->save_post($post_id, true);
+            $thumbnailcode = $this->get_base64_thumb_value($post_id);
+        }
+
+        return $thumbnailcode;
+    }
+
+    public function set_base64_thumb($post_thumbnail_id = false) {
 
         if (!$post_thumbnail_id) {
             return false;
@@ -159,3 +207,12 @@ class wpudbthumbnail {
 }
 
 $wpudbthumbnail = new wpudbthumbnail();
+
+function the_wpudbthumbnail($post_id = false) {
+    echo get_the_wpudbthumbnail($post_id);
+}
+
+function get_the_wpudbthumbnail($post_id = false) {
+    global $wpudbthumbnail;
+    return $wpudbthumbnail->get_base64_thumb($post_id);
+}
