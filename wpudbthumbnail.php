@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.6
+Version: 0.7
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -14,7 +14,7 @@ class wpudbthumbnail {
 
     private $meta_id = 'wpudbthumbnail_base64thumb';
     private $jpeg_quality = 30;
-    private $image_size = 10;
+    private $image_size = 40;
     private $cache_in_file = false;
     private $post_types = 'any';
 
@@ -185,6 +185,10 @@ class wpudbthumbnail {
         /* Save tmp image */
         $tmp_file = $image->generate_filename('tmp-thumb', $upload_dir['basedir'], $type);
         $image->save($tmp_file, $mime_type);
+
+        $this->compress_image_file($tmp_file, $type);
+
+        /* Extract file content */
         $data = file_get_contents($tmp_file);
         unlink($tmp_file);
 
@@ -192,6 +196,23 @@ class wpudbthumbnail {
         $base64 = 'data:' . $mime_type . ';base64,' . base64_encode($data);
 
         return $base64;
+    }
+
+    public function compress_image_file($tmp_file, $type = 'jpg') {
+        /* Remove image metas */
+        if (class_exists('Imagick')) {
+            $img = new Imagick($tmp_file);
+            $img->stripImage();
+            $img->writeImage($tmp_file);
+            $img->clear();
+            $img->destroy();
+        } elseif (function_exists('gd_info')) {
+            if ($type == 'jpg') {
+                /* GD is installed and working */
+                $img = imagecreatefromjpeg($tmp_file);
+                imagejpeg($img, $tmp_file);
+            }
+        }
     }
 
     /* ----------------------------------------------------------
