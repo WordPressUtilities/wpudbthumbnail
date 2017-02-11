@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.7
+Version: 0.8
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -31,14 +31,21 @@ class wpudbthumbnail {
         $this->post_types = apply_filters('wpudbthumbnail_posttypes', $this->post_types);
         $this->cache_in_file = apply_filters('wpudbthumbnail_cacheinfile', $this->cache_in_file);
 
-        if ($this->cache_in_file) {
-            $upload_dir = wp_upload_dir();
-            $this->cache_dir = apply_filters('wpudbthumbnail_cachedir', $upload_dir['basedir'] . '/wpudbthumbnail/');
-            if (!is_dir($this->cache_dir)) {
-                @mkdir($this->cache_dir, 0755);
-                @chmod($this->cache_dir, 0755);
-                @file_put_contents($this->cache_dir . '.htaccess', 'deny from all');
-            }
+        /* File cache settings */
+        $upload_dir = wp_upload_dir();
+        $this->cache_dir = apply_filters('wpudbthumbnail_cachedir', $upload_dir['basedir'] . '/wpudbthumbnail/');
+        if ($this->cache_in_file && !is_dir($this->cache_dir)) {
+            @mkdir($this->cache_dir, 0755);
+            @chmod($this->cache_dir, 0755);
+            @file_put_contents($this->cache_dir . '.htaccess', 'deny from all');
+        }
+
+        /* Settings version */
+        $settings_key = md5($this->jpeg_quality . $this->image_size . serialize($this->post_types) . $this->cache_in_file);
+        $settings_version = get_option('wpudbthumbnail_settingsversion');
+        if ($settings_version != $settings_key) {
+            update_option('wpudbthumbnail_settingsversion', $settings_key);
+            $this->clear_cache();
         }
     }
 
@@ -216,13 +223,46 @@ class wpudbthumbnail {
     }
 
     /* ----------------------------------------------------------
+      Clear
+    ---------------------------------------------------------- */
+
+    public function clear_cache() {
+
+        /* Delete post metas */
+        delete_post_meta_by_key($this->meta_id);
+        delete_post_meta_by_key($this->meta_id . '_id');
+
+        /* Delete cache folder content */
+        if (!is_dir($this->cache_dir)) {
+            return;
+        }
+        $files = glob($this->cache_dir . "*.base64");
+        foreach ($files as $filename) {
+            @unlink($filename);
+        }
+    }
+
+    /* ----------------------------------------------------------
       Uninstall
     ---------------------------------------------------------- */
 
     public function uninstall() {
-        /* Delete used post metas */
-        delete_post_meta_by_key($this->meta_id);
-        delete_post_meta_by_key($this->meta_id . '_id');
+        // Clear cache
+        $this->clear_cache();
+
+        // Delete remaining folders
+        if (!is_dir($this->cache_dir)) {
+            return;
+        }
+        $files = scandir($this->cache_dir);
+        foreach ($files as $file) {
+            if ($file == '.' || $file == '..') {
+                continue;
+            }
+            @unlink($this->cache_dir . $file);
+        }
+
+        @rmdir($this->cache_dir);
     }
 
 }
