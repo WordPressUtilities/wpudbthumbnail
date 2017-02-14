@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.9
+Version: 0.9.1
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -20,6 +20,8 @@ class wpudbthumbnail {
     private $jpeg_prefix = '';
     private $compress_base64 = true;
     private $debug = false;
+
+    public $major_version = '0.9';
 
     public function __construct() {
         add_action('init', array(&$this, 'init'));
@@ -45,7 +47,7 @@ class wpudbthumbnail {
         }
 
         /* Settings version */
-        $settings_key = md5($this->jpeg_quality . $this->image_size . serialize($this->post_types) . serialize($this->compress_base64) . $this->cache_in_file);
+        $settings_key = md5($this->major_version.$this->jpeg_quality . $this->image_size . serialize($this->post_types) . serialize($this->compress_base64) . $this->cache_in_file);
         $settings_version = get_option('wpudbthumbnail_settingsversion');
         if ($settings_version != $settings_key) {
             update_option('wpudbthumbnail_settingsversion', $settings_key);
@@ -122,8 +124,8 @@ class wpudbthumbnail {
         if ($this->compress_base64) {
             $base64 = str_replace('data:image/jpeg;base64,/9j/', '#d#', $base64);
             $base64 = str_replace($this->jpeg_prefix, '#j#', $base64);
-            if ($this->cache_in_file && function_exists('gzencode')) {
-                $base64 = gzencode($base64);
+            if ($this->cache_in_file && function_exists('gzdeflate')) {
+                $base64 = gzdeflate($base64);
             }
         }
 
@@ -216,8 +218,8 @@ class wpudbthumbnail {
         }
 
         if ($this->compress_base64) {
-            if ($this->cache_in_file && function_exists('gzencode')) {
-                $base64 = gzdecode($base64);
+            if ($this->cache_in_file && function_exists('gzinflate') && $base64) {
+                $base64 = gzinflate($base64);
             }
             $base64 = str_replace('#d#', 'data:image/jpeg;base64,/9j/', $base64);
             $base64 = str_replace('#j#', $this->jpeg_prefix, $base64);
@@ -257,7 +259,7 @@ class wpudbthumbnail {
         /* Extract common part in base64 strings */
         $datab1 = explode('/', $this->generate_base64_thumb(dirname(__FILE__) . '/images/test.jpg'));
         $this->jpeg_prefix = $datab1[4];
-        update_option('wpudbthumbnail_jpegprefix', $prefix);
+        update_option('wpudbthumbnail_jpegprefix', $this->jpeg_prefix);
     }
 
     /* ----------------------------------------------------------
