@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.9.1
+Version: 0.10.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -13,15 +13,18 @@ License URI: http://opensource.org/licenses/MIT
 class wpudbthumbnail {
 
     private $meta_id = 'wpudbthumbnail_base64thumb';
+    private $meta_id2 = 'wpudbthumbnail_basehexa';
     private $jpeg_quality = 30;
     private $image_size = 40;
     private $cache_in_file = false;
     private $post_types = 'any';
     private $jpeg_prefix = '';
+    private $store_base64 = true;
+    private $store_color = false;
     private $compress_base64 = true;
     private $debug = false;
 
-    public $major_version = '0.9';
+    public $major_version = '0.10';
 
     public function __construct() {
         add_action('init', array(&$this, 'init'));
@@ -36,6 +39,8 @@ class wpudbthumbnail {
         $this->post_types = apply_filters('wpudbthumbnail_posttypes', $this->post_types);
         $this->cache_in_file = apply_filters('wpudbthumbnail_cacheinfile', $this->cache_in_file);
         $this->compress_base64 = apply_filters('wpudbthumbnail_compress_base64', $this->compress_base64);
+        $this->store_base64 = apply_filters('wpudbthumbnail_store_base64', $this->store_base64);
+        $this->store_color = apply_filters('wpudbthumbnail_store_color', $this->store_color);
 
         /* File cache settings */
         $upload_dir = wp_upload_dir();
@@ -47,7 +52,7 @@ class wpudbthumbnail {
         }
 
         /* Settings version */
-        $settings_key = md5($this->major_version.$this->jpeg_quality . $this->image_size . serialize($this->post_types) . serialize($this->compress_base64) . $this->cache_in_file);
+        $settings_key = md5($this->major_version . $this->jpeg_quality . $this->image_size . serialize($this->post_types) . serialize($this->compress_base64) . $this->cache_in_file);
         $settings_version = get_option('wpudbthumbnail_settingsversion');
         if ($settings_version != $settings_key) {
             update_option('wpudbthumbnail_settingsversion', $settings_key);
@@ -117,25 +122,33 @@ class wpudbthumbnail {
             return false;
         }
 
-        /* Save as base64 */
         $base_image = get_attached_file($post_thumbnail_id);
-        $base64 = $this->generate_base64_thumb($base_image);
 
-        if ($this->compress_base64) {
-            $base64 = str_replace('data:image/jpeg;base64,/9j/', '#d#', $base64);
-            $base64 = str_replace($this->jpeg_prefix, '#j#', $base64);
-            if ($this->cache_in_file && function_exists('gzdeflate')) {
-                $base64 = gzdeflate($base64);
-            }
+        /* Save as hexa */
+        if ($this->store_color) {
+            $color = $this->generate_hexa_code($base_image);
+            update_post_meta($post_id, $this->meta_id2, $color);
         }
 
-        if ($base64 !== false) {
-            if ($this->cache_in_file) {
-                $this->set_cachefilebase64($post_id, $base64);
-            } else {
-                update_post_meta($post_id, $this->meta_id, $base64);
+        /* Save as base64 */
+        if ($this->store_base64) {
+            $base64 = $this->generate_base64_thumb($base_image);
+            if ($this->compress_base64) {
+                $base64 = str_replace('data:image/jpeg;base64,/9j/', '#d#', $base64);
+                $base64 = str_replace($this->jpeg_prefix, '#j#', $base64);
+                if ($this->cache_in_file && function_exists('gzdeflate')) {
+                    $base64 = gzdeflate($base64);
+                }
             }
-            update_post_meta($post_id, $this->meta_id . '_id', $post_thumbnail_id);
+
+            if ($base64 !== false) {
+                if ($this->cache_in_file) {
+                    $this->set_cachefilebase64($post_id, $base64);
+                } else {
+                    update_post_meta($post_id, $this->meta_id, $base64);
+                }
+                update_post_meta($post_id, $this->meta_id . '_id', $post_thumbnail_id);
+            }
         }
     }
 
@@ -178,6 +191,35 @@ class wpudbthumbnail {
         $base64 = 'data:' . $mime_type . ';base64,' . base64_encode($data);
 
         return $base64;
+    }
+
+    public function generate_hexa_code($base_image = false) {
+
+        if (!$base_image) {
+            return false;
+        }
+
+        /* Retrieve image */
+        $image = wp_get_image_editor($base_image);
+        if (is_wp_error($image)) {
+            return false;
+        }
+
+        $delta = 24;
+        $reduce_brightness = true;
+        $reduce_gradients = true;
+        $num_results = 1;
+
+        include_once dirname(__FILE__) . "/inc/colors.inc.php";
+        $ex = new GetMostCommonColors();
+        $colors = $ex->Get_Color($base_image, $num_results, $reduce_brightness, $reduce_gradients, $delta);
+
+        if (empty($colors) || count($colors) != 1) {
+            return false;
+        }
+
+        return key($colors);
+
     }
 
     public function compress_image_file($tmp_file, $type = 'jpg') {
@@ -270,6 +312,7 @@ class wpudbthumbnail {
 
         /* Delete post metas */
         delete_post_meta_by_key($this->meta_id);
+        delete_post_meta_by_key($this->meta_id2);
         delete_post_meta_by_key($this->meta_id . '_id');
 
         /* Delete cache folder content */
