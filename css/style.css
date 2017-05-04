@@ -1,0 +1,14 @@
+@charset "UTF-8";
+
+.wpudbthumbnail-thumbcolor .color-info {
+    display: inline-block;
+    vertical-align: middle;
+}
+
+.wpudbthumbnail-thumbpicker {
+    display: inline-block;
+    width: 0.8em;
+    height: 0.8em;
+    border: 1px solid #000;
+    vertical-align: -1px;
+}

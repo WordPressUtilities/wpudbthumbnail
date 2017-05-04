@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.10.0
+Version: 0.11.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -24,13 +24,20 @@ class wpudbthumbnail {
     private $compress_base64 = true;
     private $debug = false;
 
-    public $major_version = '0.10';
+    public $major_version = '0.11';
 
     public function __construct() {
+        add_action('wp_loaded', array(&$this, 'wp_loaded'));
         add_action('init', array(&$this, 'init'));
         add_action('added_post_meta', array(&$this, 'update_post_meta'), 10, 4);
         add_action('updated_postmeta', array(&$this, 'update_post_meta'), 10, 4);
         add_action('deleted_post_meta', array(&$this, 'deleted_post_meta'), 10, 4);
+        add_filter('admin_post_thumbnail_html', array(&$this, 'admin_post_thumbnail_html'), 50, 3);
+        add_action('admin_enqueue_scripts', array(&$this, 'admin_css'), 11);
+    }
+
+    public function wp_loaded() {
+        load_plugin_textdomain('wpudbthumbnail', false, dirname(plugin_basename(__FILE__)) . '/lang/');
     }
 
     public function init() {
@@ -70,6 +77,39 @@ class wpudbthumbnail {
             $this->update_jpeg_prefix();
         }
     }
+
+    /* ----------------------------------------------------------
+      Admin infos
+    ---------------------------------------------------------- */
+
+    public function admin_css() {
+        wp_enqueue_style('wpudbthumbnail_style', plugins_url('css/style.css', __FILE__), array(), $this->major_version);
+    }
+
+    public function admin_post_thumbnail_html($content, $post_id, $thumbnail_id) {
+
+        /* Save as hexa */
+        $color = '';
+        if ($this->store_color) {
+            $color = get_post_meta($post_id, $this->meta_id2, 1);
+        }
+
+        if (!empty($color)) {
+            $content .= '<hr />';
+        }
+
+        if (!empty($color)) {
+            $color = '#' . $color;
+            $box_color = '<span class="wpudbthumbnail-thumbpicker" style="background-color:' . $color . ';"></span>';
+            $content .= '<p class="wpudbthumbnail-thumbcolor">' . sprintf(__('Saved thumbnail color: %s', 'wpudbthumbnail'), '<span class="color-info">' . $box_color . ' ' . $color . '</span>') . '</p>';
+        }
+
+        return $content;
+    }
+
+    /* ----------------------------------------------------------
+      Main
+    ---------------------------------------------------------- */
 
     /* Triggered when _thumbnail_id is modified */
     public function update_post_meta($meta_id, $object_id, $meta_key, $meta_value) {
