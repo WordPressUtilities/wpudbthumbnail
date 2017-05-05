@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.11.0
+Version: 0.12.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -24,7 +24,7 @@ class wpudbthumbnail {
     private $compress_base64 = true;
     private $debug = false;
 
-    public $major_version = '0.11';
+    public $major_version = '0.12';
 
     public function __construct() {
         add_action('wp_loaded', array(&$this, 'wp_loaded'));
@@ -91,7 +91,7 @@ class wpudbthumbnail {
         /* Save as hexa */
         $color = '';
         if ($this->store_color) {
-            $color = get_post_meta($post_id, $this->meta_id2, 1);
+            $color = $this->get_color_thumb_value($post_id);
         }
 
         if (!empty($color)) {
@@ -99,7 +99,6 @@ class wpudbthumbnail {
         }
 
         if (!empty($color)) {
-            $color = '#' . $color;
             $box_color = '<span class="wpudbthumbnail-thumbpicker" style="background-color:' . $color . ';"></span>';
             $content .= '<p class="wpudbthumbnail-thumbcolor">' . sprintf(__('Saved thumbnail color: %s', 'wpudbthumbnail'), '<span class="color-info">' . $box_color . ' ' . $color . '</span>') . '</p>';
         }
@@ -292,6 +291,25 @@ class wpudbthumbnail {
         file_put_contents($this->cache_file, $base64);
     }
 
+    public function get_color_thumb_value($post_id) {
+        $post_color = get_post_meta($post_id, $this->meta_id2, 1);
+        if (!empty($post_color)) {
+            $post_color = $post_color;
+        } else {
+            $post_thumbnail_id = get_post_thumbnail_id($post_id);
+            if (!is_numeric($post_thumbnail_id)) {
+                return '';
+            }
+            $base_image = get_attached_file($post_thumbnail_id);
+
+            /* Save as hexa */
+            $post_color = $this->generate_hexa_code($base_image);
+            update_post_meta($post_id, $this->meta_id2, $post_color);
+        }
+
+        return '#' . $post_color;
+    }
+
     public function get_base64_thumb_value($post_id = false) {
         if ($this->cache_in_file) {
             $base64 = $this->get_cachefilebase64($post_id);
@@ -402,4 +420,9 @@ function the_wpudbthumbnail($post_id = false) {
 function get_the_wpudbthumbnail($post_id = false) {
     global $wpudbthumbnail;
     return $wpudbthumbnail->get_base64_thumb($post_id);
+}
+
+function get_the_wpudbthumbnail_color($post_id = false) {
+    global $wpudbthumbnail;
+    return $wpudbthumbnail->get_color_thumb_value($post_id);
 }
