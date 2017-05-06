@@ -5,6 +5,7 @@
     vertical-align: middle;
 }
 
+#postimagediv .inside .wpudbthumbnail-thumbpicker,
 .wpudbthumbnail-thumbpicker {
     display: inline-block;
     width: 0.8em;

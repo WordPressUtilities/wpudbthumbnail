@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.12.0
+Version: 0.13.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -24,7 +24,7 @@ class wpudbthumbnail {
     private $compress_base64 = true;
     private $debug = false;
 
-    public $major_version = '0.12';
+    public $major_version = '0.13';
 
     public function __construct() {
         add_action('wp_loaded', array(&$this, 'wp_loaded'));
@@ -33,7 +33,7 @@ class wpudbthumbnail {
         add_action('updated_postmeta', array(&$this, 'update_post_meta'), 10, 4);
         add_action('deleted_post_meta', array(&$this, 'deleted_post_meta'), 10, 4);
         add_filter('admin_post_thumbnail_html', array(&$this, 'admin_post_thumbnail_html'), 50, 3);
-        add_action('admin_enqueue_scripts', array(&$this, 'admin_css'), 11);
+        add_action('admin_enqueue_scripts', array(&$this, 'admin_assets'), 11);
     }
 
     public function wp_loaded() {
@@ -82,8 +82,12 @@ class wpudbthumbnail {
       Admin infos
     ---------------------------------------------------------- */
 
-    public function admin_css() {
+    public function admin_assets($hook) {
+        if ($hook != 'post-new.php' && $hook != 'post.php') {
+            return;
+        }
         wp_enqueue_style('wpudbthumbnail_style', plugins_url('css/style.css', __FILE__), array(), $this->major_version);
+        wp_enqueue_script('wpudbthumbnail_script', plugins_url('js/script.js', __FILE__), array(), $this->major_version);
     }
 
     public function admin_post_thumbnail_html($content, $post_id, $thumbnail_id) {
@@ -91,17 +95,29 @@ class wpudbthumbnail {
         /* Save as hexa */
         $color = '';
         if ($this->store_color) {
-            $color = $this->get_color_thumb_value($post_id);
+            $color = get_the_wpudbthumbnail_color($post_id);
         }
 
-        if (!empty($color)) {
-            $content .= '<hr />';
+        $pic = '';
+        if ($this->store_base64) {
+            $pic = get_the_wpudbthumbnail($post_id);
         }
 
+        if (empty($color) && empty($pic)) {
+            return $content;
+        }
+
+        $content .= '<div class="wpudbthumbnail-wrapper"><hr />';
         if (!empty($color)) {
-            $box_color = '<span class="wpudbthumbnail-thumbpicker" style="background-color:' . $color . ';"></span>';
+            $box_color = '<span class="wpudbthumbnail-thumbpicker" style="background-color:' . $color . '"></span>';
             $content .= '<p class="wpudbthumbnail-thumbcolor">' . sprintf(__('Saved thumbnail color: %s', 'wpudbthumbnail'), '<span class="color-info">' . $box_color . ' ' . $color . '</span>') . '</p>';
         }
+
+        if (!empty($pic)) {
+            $box_img = '<img src="' . $pic . '" class="wpudbthumbnail-thumbpicker" />';
+            $content .= '<p class="wpudbthumbnail-thumbcolor"><span class="color-info">' . $box_img . '</span> ' . __('Saved thumbnail', 'wpudbthumbnail') . '</p>';
+        }
+        $content .= '</div>';
 
         return $content;
     }
@@ -244,7 +260,7 @@ class wpudbthumbnail {
             return false;
         }
 
-        $delta = 24;
+        $delta = 16;
         $reduce_brightness = true;
         $reduce_gradients = true;
         $num_results = 1;
@@ -415,6 +431,10 @@ $wpudbthumbnail = new wpudbthumbnail();
 
 function the_wpudbthumbnail($post_id = false) {
     echo get_the_wpudbthumbnail($post_id);
+}
+
+function the_wpudbthumbnail_color($post_id = false) {
+    echo get_the_wpudbthumbnail_color($post_id);
 }
 
 function get_the_wpudbthumbnail($post_id = false) {

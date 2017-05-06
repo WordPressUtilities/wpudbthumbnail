@@ -1,7 +1,7 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: WPU DB Thumbnail\n"
-"POT-Creation-Date: 2017-05-05 15:35+0200\n"
+"POT-Creation-Date: 2017-05-06 23:38+0200\n"
 "PO-Revision-Date: \n"
 "Last-Translator: Darklg <darklg.blog@gmail.com>\n"
 "Language-Team: \n"
@@ -15,7 +15,11 @@ msgstr ""
 "X-Poedit-KeywordsList: __;_e\n"
 "X-Poedit-SearchPath-0: ../.\n"
 
-#: .././wpudbthumbnail.php:103
+#: .././wpudbthumbnail.php:113
 #, php-format
 msgid "Saved thumbnail color: %s"
 msgstr "Couleur de la vignette enregistrée : %s"
+
+#: .././wpudbthumbnail.php:118
+msgid "Saved thumbnail"
+msgstr "Vignette sauvegardée"
