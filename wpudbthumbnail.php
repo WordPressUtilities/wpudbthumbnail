@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.13.0
+Version: 0.14.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -24,7 +24,7 @@ class wpudbthumbnail {
     private $compress_base64 = true;
     private $debug = false;
 
-    public $major_version = '0.13';
+    public $major_version = '0.14';
 
     public function __construct() {
         add_action('wp_loaded', array(&$this, 'wp_loaded'));
@@ -263,17 +263,26 @@ class wpudbthumbnail {
         $delta = 16;
         $reduce_brightness = true;
         $reduce_gradients = true;
-        $num_results = 1;
+        $num_results = 10;
 
         include_once dirname(__FILE__) . "/inc/colors.inc.php";
         $ex = new GetMostCommonColors();
         $colors = $ex->Get_Color($base_image, $num_results, $reduce_brightness, $reduce_gradients, $delta);
 
-        if (empty($colors) || count($colors) != 1) {
+        if (empty($colors) || count($colors) < 1) {
             return false;
         }
+        $excluded_colors = apply_filters('wpudbthumbnail_excluded_colors', array('ffffff', '000000'));
+        $excluded_colors = array_map("strtolower", $excluded_colors);
 
-        return key($colors);
+        foreach ($colors as $k => $percent) {
+            if (in_array($k, $excluded_colors)) {
+                continue;
+            }
+            return $k;
+        }
+
+        return apply_filters('wpudbthumbnail_default_color', '000000');
 
     }
 
