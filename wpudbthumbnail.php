@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.14.0
+Version: 0.15.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -24,7 +24,7 @@ class wpudbthumbnail {
     private $compress_base64 = true;
     private $debug = false;
 
-    public $major_version = '0.14';
+    public $major_version = '0.15';
 
     public function __construct() {
         add_action('wp_loaded', array(&$this, 'wp_loaded'));
@@ -325,10 +325,16 @@ class wpudbthumbnail {
             if (!is_numeric($post_thumbnail_id)) {
                 return '';
             }
-            $base_image = get_attached_file($post_thumbnail_id);
-
+            $base_image = wp_get_attachment_image_src($post_thumbnail_id, 'full');
+            if (!is_array($base_image)) {
+                return '';
+            }
+            /* Use "large" size if full size is too big */
+            if ($base_image[1] > 2000 || $base_image[2] > 2000) {
+                $base_image = wp_get_attachment_image_src($post_thumbnail_id, 'thumbnail');
+            }
             /* Save as hexa */
-            $post_color = $this->generate_hexa_code($base_image);
+            $post_color = $this->generate_hexa_code($base_image[0]);
             update_post_meta($post_id, $this->meta_id2, $post_color);
         }
 
