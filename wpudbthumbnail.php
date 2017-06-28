@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.15.0
+Version: 0.16.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -24,6 +24,7 @@ class wpudbthumbnail {
     private $compress_base64 = true;
     private $debug = false;
 
+    /* Edit when thumbnail generation method has been changed */
     public $major_version = '0.15';
 
     public function __construct() {
@@ -250,14 +251,16 @@ class wpudbthumbnail {
 
     public function generate_hexa_code($base_image = false) {
 
+        $default_color = apply_filters('wpudbthumbnail_default_color', '000000');
+
         if (!$base_image) {
-            return false;
+            return $default_color;
         }
 
         /* Retrieve image */
         $image = wp_get_image_editor($base_image);
         if (is_wp_error($image)) {
-            return false;
+            return $default_color;
         }
 
         $delta = 16;
@@ -270,7 +273,7 @@ class wpudbthumbnail {
         $colors = $ex->Get_Color($base_image, $num_results, $reduce_brightness, $reduce_gradients, $delta);
 
         if (empty($colors) || count($colors) < 1) {
-            return false;
+            return $default_color;
         }
         $excluded_colors = apply_filters('wpudbthumbnail_excluded_colors', array('ffffff', '000000'));
         $excluded_colors = array_map("strtolower", $excluded_colors);
@@ -281,8 +284,7 @@ class wpudbthumbnail {
             }
             return $k;
         }
-
-        return apply_filters('wpudbthumbnail_default_color', '000000');
+        return $default_color;
 
     }
 
