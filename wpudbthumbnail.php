@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.16.0
+Version: 0.16.1
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -22,10 +22,12 @@ class wpudbthumbnail {
     private $store_base64 = true;
     private $store_color = false;
     private $compress_base64 = true;
+    private $excluded_colors = array('ffffff', '000000');
+    private $default_color = '000000';
     private $debug = false;
 
     /* Edit when thumbnail generation method has been changed */
-    public $major_version = '0.15';
+    public $major_version = '0.16';
 
     public function __construct() {
         add_action('wp_loaded', array(&$this, 'wp_loaded'));
@@ -49,6 +51,8 @@ class wpudbthumbnail {
         $this->compress_base64 = apply_filters('wpudbthumbnail_compress_base64', $this->compress_base64);
         $this->store_base64 = apply_filters('wpudbthumbnail_store_base64', $this->store_base64);
         $this->store_color = apply_filters('wpudbthumbnail_store_color', $this->store_color);
+        $this->default_color = apply_filters('wpudbthumbnail_default_color', $this->default_color);
+        $this->excluded_colors = array_map("strtolower", apply_filters('wpudbthumbnail_excluded_colors', $this->excluded_colors));
 
         /* File cache settings */
         $upload_dir = wp_upload_dir();
@@ -251,11 +255,19 @@ class wpudbthumbnail {
 
     public function generate_hexa_code($base_image = false) {
 
-        $default_color = apply_filters('wpudbthumbnail_default_color', '000000');
-
         if (!$base_image) {
             return $default_color;
         }
+
+        /* Ensure we work with a correct path */
+        $base_url = site_url() . '/';
+        if (substr($base_url, -1) != '/') {
+            $base_url .= '/';
+        }
+        $base_image = str_replace($base_url, ABSPATH, $base_image);
+
+        /* Ensure file exists */
+
 
         /* Retrieve image */
         $image = wp_get_image_editor($base_image);
@@ -271,15 +283,12 @@ class wpudbthumbnail {
         include_once dirname(__FILE__) . "/inc/colors.inc.php";
         $ex = new GetMostCommonColors();
         $colors = $ex->Get_Color($base_image, $num_results, $reduce_brightness, $reduce_gradients, $delta);
-
         if (empty($colors) || count($colors) < 1) {
             return $default_color;
         }
-        $excluded_colors = apply_filters('wpudbthumbnail_excluded_colors', array('ffffff', '000000'));
-        $excluded_colors = array_map("strtolower", $excluded_colors);
 
         foreach ($colors as $k => $percent) {
-            if (in_array($k, $excluded_colors)) {
+            if (in_array($k, $this->excluded_colors)) {
                 continue;
             }
             return $k;
@@ -320,7 +329,7 @@ class wpudbthumbnail {
 
     public function get_color_thumb_value($post_id) {
         $post_color = get_post_meta($post_id, $this->meta_id2, 1);
-        if (!empty($post_color)) {
+        if (!empty($post_color) && !in_array($post_color, $this->excluded_colors)) {
             $post_color = $post_color;
         } else {
             $post_thumbnail_id = get_post_thumbnail_id($post_id);
