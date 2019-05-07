@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.16.1
+Version: 0.16.2
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -256,7 +256,7 @@ class wpudbthumbnail {
     public function generate_hexa_code($base_image = false) {
 
         if (!$base_image) {
-            return $default_color;
+            return $this->default_color;
         }
 
         /* Ensure we work with a correct path */
@@ -272,7 +272,7 @@ class wpudbthumbnail {
         /* Retrieve image */
         $image = wp_get_image_editor($base_image);
         if (is_wp_error($image)) {
-            return $default_color;
+            return $this->default_color;
         }
 
         $delta = 16;
@@ -284,7 +284,7 @@ class wpudbthumbnail {
         $ex = new GetMostCommonColors();
         $colors = $ex->Get_Color($base_image, $num_results, $reduce_brightness, $reduce_gradients, $delta);
         if (empty($colors) || count($colors) < 1) {
-            return $default_color;
+            return $this->default_color;
         }
 
         foreach ($colors as $k => $percent) {
@@ -293,7 +293,7 @@ class wpudbthumbnail {
             }
             return $k;
         }
-        return $default_color;
+        return $this->default_color;
 
     }
 
