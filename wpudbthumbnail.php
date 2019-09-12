@@ -3,7 +3,7 @@
 /*
 Plugin Name: WPU DB Thumbnail
 Description: Store a small thumbnail in db
-Version: 0.16.2
+Version: 0.17.0
 Author: Darklg
 Author URI: http://darklg.me/
 License: MIT License
@@ -23,11 +23,12 @@ class wpudbthumbnail {
     private $store_color = false;
     private $compress_base64 = true;
     private $excluded_colors = array('ffffff', '000000');
-    private $default_color = '000000';
+    private $avoid_grays = false;
+    private $default_color = 'a1a2a3';
     private $debug = false;
 
     /* Edit when thumbnail generation method has been changed */
-    public $major_version = '0.16';
+    public $major_version = '0.17';
 
     public function __construct() {
         add_action('wp_loaded', array(&$this, 'wp_loaded'));
@@ -52,6 +53,7 @@ class wpudbthumbnail {
         $this->store_base64 = apply_filters('wpudbthumbnail_store_base64', $this->store_base64);
         $this->store_color = apply_filters('wpudbthumbnail_store_color', $this->store_color);
         $this->default_color = apply_filters('wpudbthumbnail_default_color', $this->default_color);
+        $this->avoid_grays = apply_filters('wpudbthumbnail_avoid_grays', $this->avoid_grays);
         $this->excluded_colors = array_map("strtolower", apply_filters('wpudbthumbnail_excluded_colors', $this->excluded_colors));
 
         /* File cache settings */
@@ -254,7 +256,6 @@ class wpudbthumbnail {
     }
 
     public function generate_hexa_code($base_image = false) {
-
         if (!$base_image) {
             return $this->default_color;
         }
@@ -265,9 +266,12 @@ class wpudbthumbnail {
             $base_url .= '/';
         }
         $base_image = str_replace($base_url, ABSPATH, $base_image);
+        $base_image = apply_filters('wpudbthumbnail__generate_hexa_code__base_image_path', $base_image);
 
         /* Ensure file exists */
-
+        if (!file_exists($base_image)) {
+            return $this->default_color;
+        }
 
         /* Retrieve image */
         $image = wp_get_image_editor($base_image);
@@ -283,8 +287,30 @@ class wpudbthumbnail {
         include_once dirname(__FILE__) . "/inc/colors.inc.php";
         $ex = new GetMostCommonColors();
         $colors = $ex->Get_Color($base_image, $num_results, $reduce_brightness, $reduce_gradients, $delta);
+
         if (empty($colors) || count($colors) < 1) {
             return $this->default_color;
+        }
+
+        /* Avoid shades of gray if possible */
+        if ($this->avoid_grays) {
+            $base_colors = array();
+            foreach ($colors as $color => $freq) {
+                /* Invalid color ? */
+                if (strlen($color) != '6') {
+                    continue;
+                }
+
+                $red_value = substr($color, 0, 2);
+                if ($color == $red_value . $red_value . $red_value) {
+                    continue;
+                }
+
+                $base_colors[$color] = $freq;
+            }
+            if (!empty($base_colors)) {
+                $colors = $base_colors;
+            }
         }
 
         foreach ($colors as $k => $percent) {
